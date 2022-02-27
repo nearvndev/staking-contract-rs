@@ -29,7 +29,7 @@ impl FungibleTokenReceiver for StakingContract {
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         let account: Option<Account> = self.accounts.get(&sender_id);
         assert!(account.is_some(), "ERR_NOT_FOUND_ACCOUNT");
-        assert!(self.paused, "ERR_CONTRACT_PAUSED");
+        assert!(!self.paused, "ERR_CONTRACT_PAUSED");
         assert_eq!(self.ft_contract_id, env::predecessor_account_id(), "ERR_NOT_VALID_FT_CONTRACT");
 
         self.internal_deposit_and_stake(sender_id, amount.0);

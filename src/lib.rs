@@ -79,6 +79,10 @@ impl StakingContract {
         U128(self.pre_reward + self.internal_calculate_global_reward())
     }
 
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
+
     #[payable]
     pub fn deposit_storage(&mut self, account_id: Option<AccountId>) {
         assert_at_least_one_yocto();
@@ -103,7 +107,7 @@ impl StakingContract {
             self.accounts.insert(&account, &new_account);
             let after_storage_usage = env::storage_usage();
 
-            refund_deposit(before_storage_usage - after_storage_usage);
+            refund_deposit(after_storage_usage - before_storage_usage);
         }
 
     }
