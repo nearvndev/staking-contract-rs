@@ -6,7 +6,8 @@ impl StakingContract {
     pub(crate) fn internal_deposit_and_stake(&mut self, account_id: AccountId, amount: Balance) {
 
         // Check account exists
-        let mut account: Account = self.accounts.get(&account_id).unwrap();
+        let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
+        let mut account = Account::from(upgradable_account);
 
         // if exist account, update balance and update pre data
         let new_reward: Balance = self.internal_calculate_account_reward(&account);
@@ -16,7 +17,7 @@ impl StakingContract {
         account.pre_reward += new_reward;
         account.stake_balance += amount;
         account.last_block_balance_change = env::block_index();
-        self.accounts.insert(&account_id, &account);
+        self.accounts.insert(&account_id, &UpgradableAccount::from(account));
 
 
         // Update contract data
@@ -28,7 +29,9 @@ impl StakingContract {
     }
 
     pub(crate) fn internal_unstake(&mut self, account_id: AccountId, amount: Balance) {
-        let mut account: Account = self.accounts.get(&account_id).unwrap();
+        let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
+
+        let mut account = Account::from(upgradable_account);
 
         assert!(amount <= account.stake_balance, "ERR_AMOUNT_MUST_LESS_THAN_BALANCE");
 
@@ -45,7 +48,7 @@ impl StakingContract {
         account.unstake_start_timestamp = env::block_timestamp();
         
         // update new account data
-        self.accounts.insert(&account_id, &account);
+        self.accounts.insert(&account_id, &UpgradableAccount::from(account));
 
         // update contract data
         let new_contract_reward: Balance = self.internal_calculate_global_reward();
@@ -55,10 +58,11 @@ impl StakingContract {
     }
 
     pub(crate) fn internal_withdraw(&mut self, account_id: AccountId) -> Account {
-        let account: Account = self.accounts.get(&account_id).unwrap();
+        let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
+        let account: Account = Account::from(upgradable_account);
 
         assert!(account.unstake_balance > 0, "ERR_UNSTAKE_BALANCE_IS_ZERO");
-        assert!(account.unstake_available_epoch_height >= env::epoch_height(), "ERR_DISABLE_WITHDRAW");
+        assert!(account.unstake_available_epoch_height <= env::epoch_height(), "ERR_DISABLE_WITHDRAW");
 
         let new_account: Account = Account {
             pre_reward: account.pre_reward,
@@ -70,7 +74,7 @@ impl StakingContract {
             unstake_available_epoch_height: 0
         };
 
-        self.accounts.insert(&account_id, &new_account);
+        self.accounts.insert(&account_id, &UpgradableAccount::from(new_account));
 
         account
     }

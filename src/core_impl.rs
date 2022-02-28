@@ -2,7 +2,9 @@ use near_sdk::Gas;
 
 use crate::*;
 
-pub const FT_TRANSFER_GAS: Gas = 25_000_000_000_000;
+pub const FT_TRANSFER_GAS: Gas = 10_000_000_000_000;
+pub const WITHDRAW_CALLBACK_GAS: Gas = 10_000_000_000_000;
+pub const HARVEST_CALLBACK_GAS: Gas = 10_000_000_000_000;
 
 pub trait FungibleTokenReceiver {
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128>;
@@ -27,8 +29,8 @@ impl FungibleTokenReceiver for StakingContract {
      * 2. handle stake
      */
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        let account: Option<Account> = self.accounts.get(&sender_id);
-        assert!(account.is_some(), "ERR_NOT_FOUND_ACCOUNT");
+        let upgradable_account: Option<UpgradableAccount> = self.accounts.get(&sender_id);
+        assert!(upgradable_account.is_some(), "ERR_NOT_FOUND_ACCOUNT");
         assert!(!self.paused, "ERR_CONTRACT_PAUSED");
         assert_eq!(self.ft_contract_id, env::predecessor_account_id(), "ERR_NOT_VALID_FT_CONTRACT");
 
@@ -62,7 +64,7 @@ impl StakingContract {
             U128(old_account.unstake_balance), 
             Some(String::from("Staking contract withdraw")), 
             &self.ft_contract_id, 
-            NO_DEPOSIT, 
+            DEPOSIT_ONE_YOCTOR, 
             FT_TRANSFER_GAS
         ).then(
             ext_self::ft_withdraw_callback(
@@ -70,7 +72,7 @@ impl StakingContract {
                 old_account, 
                 &env::current_account_id(), 
                 NO_DEPOSIT, 
-                env::prepaid_gas() - FT_TRANSFER_GAS
+                WITHDRAW_CALLBACK_GAS
             )
         )
     }
@@ -79,7 +81,8 @@ impl StakingContract {
     pub fn harvest(&mut self) -> Promise {
         assert_one_yocto();
         let account_id: AccountId = env::predecessor_account_id();
-        let account: Account = self.accounts.get(&account_id).unwrap();
+        let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
+        let account: Account = Account::from(upgradable_account);
 
         let new_reward: Balance = self.internal_calculate_account_reward(&account);
         let current_reward: Balance = account.pre_reward + new_reward;
@@ -91,7 +94,7 @@ impl StakingContract {
             U128(current_reward), 
             Some("Staking contract harvest".to_string()), 
             &self.ft_contract_id, 
-            NO_DEPOSIT, 
+            DEPOSIT_ONE_YOCTOR, 
             FT_TRANSFER_GAS
         ).then(
             ext_self::ft_transfer_callback(
@@ -99,7 +102,7 @@ impl StakingContract {
                 account_id.clone(),
                 &env::current_account_id(), 
                 NO_DEPOSIT, 
-                env::prepaid_gas() - FT_TRANSFER_GAS
+                HARVEST_CALLBACK_GAS
             )
         )
     }
@@ -110,13 +113,14 @@ impl StakingContract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_value) => {
-                let mut account: Account = self.accounts.get(&account_id).unwrap();
+                let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
+                let mut account: Account = Account::from(upgradable_account);
 
                 // update account data
                 account.pre_reward = 0;
                 account.last_block_balance_change = env::block_index();
 
-                self.accounts.insert(&account_id, &account);
+                self.accounts.insert(&account_id, &UpgradableAccount::from(account));
                 self.pre_reward -= amount.0;
 
                 amount
@@ -135,7 +139,7 @@ impl StakingContract {
             },
             PromiseResult::Failed => {
                 // Handle rollback data
-                self.accounts.insert(&account_id, &old_account);
+                self.accounts.insert(&account_id, &UpgradableAccount::from(old_account));
                 U128(0)
             },
         }

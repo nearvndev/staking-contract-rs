@@ -14,6 +14,7 @@ mod core_impl;
 mod enumeration;
 
 pub const NO_DEPOSIT: Balance = 0;
+pub const DEPOSIT_ONE_YOCTOR: Balance = 1;
 pub const NUM_EPOCHS_TO_UNLOCK: EpochHeight = 1;
 
 #[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, Copy)]
@@ -44,9 +45,10 @@ pub struct StakingContract {
     pub ft_contract_id: AccountId,
     pub config: Config, // Config reward and apr for contract
     pub total_stake_balance: Balance, // Total token balance lock in contract
-    pub pre_reward: Balance,
+    pub total_paid_reward_balance: Balance,
+    pub pre_reward: Balance, // Pre reward before change total balance
     pub last_block_balance_change: BlockHeight,
-    pub accounts: LookupMap<AccountId, Account>, // List staking user
+    pub accounts: LookupMap<AccountId, UpgradableAccount>, // List staking user
     pub paused: bool, // Pause staking pool with limit reward,
     pub paused_in_block: BlockHeight
 }
@@ -66,6 +68,7 @@ impl StakingContract {
             ft_contract_id,
             config,
             total_stake_balance: 0,
+            total_paid_reward_balance: 0,
             pre_reward: 0,
             last_block_balance_change: env::block_index(),
             accounts: LookupMap::new(StorageKey::AccountKey),
@@ -88,7 +91,7 @@ impl StakingContract {
         assert_at_least_one_yocto();
         let account = account_id.unwrap_or_else(|| env::predecessor_account_id());
 
-        let account_stake: Option<Account> = self.accounts.get(&account);
+        let account_stake: Option<UpgradableAccount> = self.accounts.get(&account);
         if account_stake.is_some() {
             refund_deposit(0);
         } else {
@@ -104,7 +107,9 @@ impl StakingContract {
                 unstake_start_timestamp: 0
             };
 
-            self.accounts.insert(&account, &new_account);
+            let upgrade_account = UpgradableAccount::from(new_account);
+
+            self.accounts.insert(&account, &upgrade_account);
             let after_storage_usage = env::storage_usage();
 
             refund_deposit(after_storage_usage - before_storage_usage);
