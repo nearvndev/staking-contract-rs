@@ -121,7 +121,7 @@ impl StakingContract {
                 account.last_block_balance_change = env::block_index();
 
                 self.accounts.insert(&account_id, &UpgradableAccount::from(account));
-                self.pre_reward -= amount.0;
+                self.total_paid_reward_balance += amount.0;
 
                 amount
             },
