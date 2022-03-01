@@ -87,7 +87,7 @@ impl StakingContract {
     }
 
     #[payable]
-    pub fn deposit_storage(&mut self, account_id: Option<AccountId>) {
+    pub fn storage_deposit(&mut self, account_id: Option<AccountId>) {
         assert_at_least_one_yocto();
         let account = account_id.unwrap_or_else(|| env::predecessor_account_id());
 
