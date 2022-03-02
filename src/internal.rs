@@ -9,6 +9,10 @@ impl StakingContract {
         let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
         let mut account = Account::from(upgradable_account);
 
+        if account.stake_balance == 0 {
+            self.total_staker += 1;
+        }
+
         // if exist account, update balance and update pre data
         let new_reward: Balance = self.internal_calculate_account_reward(&account);
 
@@ -47,6 +51,10 @@ impl StakingContract {
         account.unstake_balance += amount;
         account.unstake_start_timestamp = env::block_timestamp();
         
+        if account.stake_balance == 0 {
+            self.total_staker -= 1;
+        }
+
         // update new account data
         self.accounts.insert(&account_id, &UpgradableAccount::from(account));
 

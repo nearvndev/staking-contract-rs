@@ -46,6 +46,7 @@ pub struct StakingContract {
     pub config: Config, // Config reward and apr for contract
     pub total_stake_balance: Balance, // Total token balance lock in contract
     pub total_paid_reward_balance: Balance,
+    pub total_staker: Balance,
     pub pre_reward: Balance, // Pre reward before change total balance
     pub last_block_balance_change: BlockHeight,
     pub accounts: LookupMap<AccountId, UpgradableAccount>, // List staking user
@@ -69,6 +70,7 @@ impl StakingContract {
             config,
             total_stake_balance: 0,
             total_paid_reward_balance: 0,
+            total_staker: 0,
             pre_reward: 0,
             last_block_balance_change: env::block_index(),
             accounts: LookupMap::new(StorageKey::AccountKey),
@@ -117,7 +119,24 @@ impl StakingContract {
 
     }
 
+    // View func get storage balance, return 0 if account need deposit to interact
+    pub fn storage_balance_of(&self, account_id: AccountId) -> U128 {
+        let account: Option<UpgradableAccount> = self.accounts.get(&account_id);
+        if account.is_some() {
+            U128(1)
+        } else {
+            U128(0)
+        }
+    }
+
     pub(crate) fn assert_owner(&self) {
         assert_eq!(env::predecessor_account_id(), self.owner_id, "Only owner contract can be access");
+    }
+
+    #[init(ignore_state)]
+    #[private]
+    pub fn migrate() -> Self {
+        let contract: StakingContract = env::state_read().expect("ERR_READ_CONTRACT_STATE");
+        contract
     }
 }

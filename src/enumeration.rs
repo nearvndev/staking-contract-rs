@@ -1,5 +1,14 @@
 use crate::*;
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct PoolInfo {
+    pub total_stake_balance: U128,
+    pub total_reward: U128,
+    pub total_stakers: U128,
+    pub is_paused: bool
+}
+
 #[near_bindgen]
 impl StakingContract {
     /**
@@ -27,6 +36,15 @@ impl StakingContract {
             start_unstake_timestamp: account.unstake_start_timestamp,
             unstake_available_epoch: account.unstake_available_epoch_height,
             current_epoch: env::epoch_height()
+        }
+    }
+
+    pub fn get_pool_info(&self) -> PoolInfo {
+        PoolInfo { 
+            total_stake_balance: U128(self.total_stake_balance), 
+            total_reward: U128(self.pre_reward + self.internal_calculate_global_reward()), 
+            total_stakers: U128(self.total_staker), 
+            is_paused: self.paused
         }
     }
 }
