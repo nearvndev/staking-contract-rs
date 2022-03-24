@@ -23,17 +23,8 @@ pub trait ExtStakingContract {
 
 #[near_bindgen]
 impl FungibleTokenReceiver for StakingContract {
-    /**
-     * Handle use transfer token to staking contract
-     * 1. validate data
-     * 2. handle stake
-     */
-    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        let upgradable_account: Option<UpgradableAccount> = self.accounts.get(&sender_id);
-        assert!(upgradable_account.is_some(), "ERR_NOT_FOUND_ACCOUNT");
-        assert!(!self.paused, "ERR_CONTRACT_PAUSED");
-        assert_eq!(self.ft_contract_id, env::predecessor_account_id(), "ERR_NOT_VALID_FT_CONTRACT");
 
+    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         self.internal_deposit_and_stake(sender_id, amount.0);
 
         // return amount not used

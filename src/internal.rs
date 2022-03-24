@@ -2,8 +2,18 @@ use crate::*;
 
 impl StakingContract {
 
-    // User deposit FT token and stake
+    /**
+     * User deposit FT token and stake
+     * Handle use transfer token to staking contract
+     * 1. validate data
+     * 2. handle stake
+     */
     pub(crate) fn internal_deposit_and_stake(&mut self, account_id: AccountId, amount: Balance) {
+
+        let upgradable_account: Option<UpgradableAccount> = self.accounts.get(&account_id);
+        assert!(upgradable_account.is_some(), "ERR_NOT_FOUND_ACCOUNT");
+        assert!(!self.paused, "ERR_CONTRACT_PAUSED");
+        assert_eq!(self.ft_contract_id, env::predecessor_account_id(), "ERR_NOT_VALID_FT_CONTRACT");
 
         // Check account exists
         let upgradable_account: UpgradableAccount = self.accounts.get(&account_id).unwrap();
@@ -107,5 +117,21 @@ impl StakingContract {
         let diff_block = lasted_block - self.last_block_balance_change;
         let reward: Balance = (self.total_stake_balance * self.config.reward_numerator as u128 * diff_block as u128) / (self.config.reward_denumerator as u128);
         reward
+    }
+
+    pub(crate) fn internal_create_account(&mut self, account: AccountId) {
+        let new_account = Account {
+            stake_balance: 0,
+            pre_stake_balance: 0,
+            pre_reward: 0,
+            last_block_balance_change: env::block_index(),
+            unstake_balance: 0,
+            unstake_available_epoch_height: 0,
+            unstake_start_timestamp: 0
+        };
+
+        let upgrade_account = UpgradableAccount::from(new_account);
+
+        self.accounts.insert(&account, &upgrade_account);
     }
 }

@@ -98,25 +98,11 @@ impl StakingContract {
             refund_deposit(0);
         } else {
             let before_storage_usage = env::storage_usage();
-
-            let new_account = Account {
-                stake_balance: 0,
-                pre_stake_balance: 0,
-                pre_reward: 0,
-                last_block_balance_change: env::block_index(),
-                unstake_balance: 0,
-                unstake_available_epoch_height: 0,
-                unstake_start_timestamp: 0
-            };
-
-            let upgrade_account = UpgradableAccount::from(new_account);
-
-            self.accounts.insert(&account, &upgrade_account);
+            self.internal_create_account(account.clone());
             let after_storage_usage = env::storage_usage();
 
             refund_deposit(after_storage_usage - before_storage_usage);
         }
-
     }
 
     // View func get storage balance, return 0 if account need deposit to interact
@@ -138,5 +124,155 @@ impl StakingContract {
     pub fn migrate() -> Self {
         let contract: StakingContract = env::state_read().expect("ERR_READ_CONTRACT_STATE");
         contract
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+    use near_sdk::json_types::ValidAccountId;
+    use near_sdk::test_utils::{VMContextBuilder, accounts};
+    use near_sdk::{testing_env, MockedBlockchain};
+
+    fn get_context(is_view: bool) -> VMContextBuilder {
+        let mut builder = VMContextBuilder::new();
+        builder.
+        current_account_id(accounts(0))
+        .signer_account_id(accounts(0))
+        .predecessor_account_id(accounts(0))
+        .is_view(is_view);
+
+        builder
+    }
+
+    #[test]
+    fn init_default_contract_test() {
+        let context = get_context(false);
+        testing_env!(context.build());
+
+        let contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), "ft_contract".to_string());
+
+        assert_eq!(contract.owner_id, accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
+        assert_eq!(contract.ft_contract_id, "ft_contract".to_string(), "FT contract id should be init data");
+        assert_eq!(contract.config.reward_numerator, Config::default().reward_numerator, "Config must be equal default");
+        assert_eq!(contract.paused, false);
+    }
+
+    #[test]
+    fn init_contract_test() {
+        let context = get_context(false);
+        testing_env!(context.build());
+
+        let contract: StakingContract = StakingContract::new(accounts(1).to_string(), "ft_contract".to_string(), Config { 
+            reward_numerator: 1500, 
+            reward_denumerator: 10000000, 
+            total_apr: 15 
+        });
+
+        assert_eq!(contract.owner_id, accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
+        assert_eq!(contract.ft_contract_id, "ft_contract".to_string(), "FT contract id should be init data");
+        assert_eq!(contract.config.reward_numerator, 1500, "Config must be equal default");
+        assert_eq!(contract.config.reward_denumerator, 10000000);
+        assert_eq!(contract.paused, false);
+    }
+
+    #[test]
+    fn deposit_and_stake_test() {
+        let mut context = get_context(false);
+        context.block_index(0);
+        testing_env!(context.build());
+
+        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), accounts(1).to_string());
+        contract.internal_create_account(env::predecessor_account_id());
+
+        
+        // Deposit and stake function call from FT contract
+        context.predecessor_account_id(accounts(1));
+        testing_env!(context.build());
+        contract.internal_deposit_and_stake(accounts(0).to_string(), 10_000_000_000_000);
+
+        context.block_index(10);
+        context.predecessor_account_id(accounts(0));
+        testing_env!(context.build());
+
+        // Test deposit balance and 
+        let upgradable_account = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let account: Account = Account::from(upgradable_account);
+
+        assert_eq!(account.stake_balance, 10_000_000_000_000);
+        assert_eq!(account.pre_reward, 0);
+        assert_eq!(account.pre_stake_balance, 0);
+        assert!(contract.internal_calculate_account_reward(&account) > 0);
+
+        // test contract balance
+        assert_eq!(contract.total_stake_balance, account.stake_balance);
+        assert_eq!(contract.total_staker, 1);
+        assert_eq!(contract.pre_reward, 0);
+        assert_eq!(contract.last_block_balance_change, 0);
+
+
+        // Test update stake balance of account
+        // Deposit and stake function call from FT contract
+        context.predecessor_account_id(accounts(1));
+        testing_env!(context.build());
+        contract.internal_deposit_and_stake(accounts(0).to_string(), 20_000_000_000_000);
+
+
+        context.block_index(20);
+        context.predecessor_account_id(accounts(0));
+        testing_env!(context.build());
+
+        // Test deposit balance and 
+        let upgradable_account_2 = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let account_update: Account = Account::from(upgradable_account_2);
+
+        assert_eq!(account_update.stake_balance, 30_000_000_000_000);
+        assert!(account_update.pre_reward > 0);
+        assert_eq!(account_update.pre_stake_balance, 10_000_000_000_000);
+        assert_eq!(account_update.last_block_balance_change, 10);
+        assert!(contract.internal_calculate_account_reward(&account_update) > 0);
+
+        // test contract balance
+        assert_eq!(contract.total_stake_balance, account_update.stake_balance);
+        assert_eq!(contract.total_staker, 1);
+        assert!(contract.pre_reward > 0);
+        assert_eq!(contract.last_block_balance_change, 10);
+    }
+
+    #[test]
+    fn unstake_test() {
+        let mut context = get_context(false);
+        context.block_index(0);
+        testing_env!(context.build());
+
+        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), accounts(1).to_string());
+        contract.internal_create_account(env::predecessor_account_id());
+
+        
+        // Deposit and stake function call from FT contract
+        context.predecessor_account_id(accounts(1));
+        testing_env!(context.build());
+        contract.internal_deposit_and_stake(accounts(0).to_string(), 30_000_000_000_000);
+
+        context.block_index(10);
+        context.epoch_height(10);
+        context.predecessor_account_id(accounts(0));
+        testing_env!(context.build());
+
+        contract.internal_unstake(accounts(0).to_string(), 10_000_000_000_000);
+
+        // Test deposit balance and 
+        let upgradable_account = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let account: Account = Account::from(upgradable_account);
+
+        assert_eq!(account.stake_balance, 20_000_000_000_000);
+        assert_eq!(account.unstake_balance, 10_000_000_000_000);
+        assert_eq!(account.last_block_balance_change, 10);
+        assert_eq!(account.unstake_available_epoch_height, 11);
+    }
+
+    #[test]
+    fn withdraw_test() {
+
     }
 }
