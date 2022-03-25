@@ -36,7 +36,7 @@ pub struct Account {
     pub unstake_available_epoch_height: EpochHeight
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct AccountJson {
     pub account_id: AccountId,

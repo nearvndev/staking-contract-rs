@@ -5,6 +5,8 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U128};
 
 use crate::account::*;
+pub use crate::enumeration::PoolInfo;
+pub use crate::account::AccountJson;
 use crate::util::*;
 
 mod account;

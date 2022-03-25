@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct PoolInfo {
     pub total_stake_balance: U128,
