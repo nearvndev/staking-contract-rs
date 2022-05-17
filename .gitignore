@@ -2,3 +2,5 @@
 Cargo.lock
 /.vscode
 /neardev
+/.idea
+/.DS_Store

@@ -104,8 +104,8 @@ impl StakingContract {
             env::block_index()
         };
         let diff_block = lasted_block - account.last_block_balance_change;
-        let reward: Balance = (account.stake_balance * self.config.reward_numerator as u128 * diff_block as u128) / (self.config.reward_denumerator as u128);
-        reward
+        let reward: U256 = (U256::from(self.total_stake_balance) * U256::from(self.config.reward_numerator) * U256::from(diff_block)) / U256::from(self.config.reward_denumerator);
+        reward.as_u128()
     }
 
     pub(crate) fn internal_calculate_global_reward(&self) -> Balance {
@@ -115,8 +115,8 @@ impl StakingContract {
             env::block_index()
         };
         let diff_block = lasted_block - self.last_block_balance_change;
-        let reward: Balance = (self.total_stake_balance * self.config.reward_numerator as u128 * diff_block as u128) / (self.config.reward_denumerator as u128);
-        reward
+        let reward: U256 = (U256::from(self.total_stake_balance) * U256::from(self.config.reward_numerator) * U256::from(diff_block)) / U256::from(self.config.reward_denumerator);
+        reward.as_u128()
     }
 
     pub(crate) fn internal_create_account(&mut self, account: AccountId) {

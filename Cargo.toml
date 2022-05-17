@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 near-sdk = "3.1.0"
+uint = { version = "0.9.3", default-features = false }
 
 
 [dev-dependencies]

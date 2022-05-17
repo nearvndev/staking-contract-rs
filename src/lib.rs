@@ -3,6 +3,12 @@ use near_sdk::{near_bindgen, AccountId, env, PanicOnDefault, Balance, EpochHeigh
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U128};
+use uint::construct_uint;
+
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
+}
 
 use crate::account::*;
 pub use crate::enumeration::PoolInfo;
