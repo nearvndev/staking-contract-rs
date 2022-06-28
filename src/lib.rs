@@ -158,10 +158,10 @@ mod tests {
         let context = get_context(false);
         testing_env!(context.build());
 
-        let contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), "ft_contract".to_string());
+        let contract: StakingContract = StakingContract::new_default_config(accounts(1), AccountId::new_unchecked("ft_contract".to_string()));
 
-        assert_eq!(contract.owner_id, accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
-        assert_eq!(contract.ft_contract_id, "ft_contract".to_string(), "FT contract id should be init data");
+        assert_eq!(contract.owner_id.to_string(), accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
+        assert_eq!(contract.ft_contract_id.to_string(), "ft_contract".to_string(), "FT contract id should be init data");
         assert_eq!(contract.config.reward_numerator, Config::default().reward_numerator, "Config must be equal default");
         assert_eq!(contract.paused, false);
     }
@@ -171,14 +171,14 @@ mod tests {
         let context = get_context(false);
         testing_env!(context.build());
 
-        let contract: StakingContract = StakingContract::new(accounts(1).to_string(), "ft_contract".to_string(), Config { 
+        let contract: StakingContract = StakingContract::new(accounts(1), AccountId::new_unchecked("ft_contract".to_string()), Config { 
             reward_numerator: 1500, 
             reward_denumerator: 10000000, 
             total_apr: 15 
         });
 
-        assert_eq!(contract.owner_id, accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
-        assert_eq!(contract.ft_contract_id, "ft_contract".to_string(), "FT contract id should be init data");
+        assert_eq!(contract.owner_id.to_string(), accounts(1).to_string(), "Contract owner should be equal {}", accounts(1).to_string());
+        assert_eq!(contract.ft_contract_id.to_string(), "ft_contract".to_string(), "FT contract id should be init data");
         assert_eq!(contract.config.reward_numerator, 1500, "Config must be equal default");
         assert_eq!(contract.config.reward_denumerator, 10000000);
         assert_eq!(contract.paused, false);
@@ -190,21 +190,21 @@ mod tests {
         context.block_index(0);
         testing_env!(context.build());
 
-        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), accounts(1).to_string());
+        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1), accounts(1));
         contract.internal_create_account(env::predecessor_account_id());
 
         
         // Deposit and stake function call from FT contract
         context.predecessor_account_id(accounts(1));
         testing_env!(context.build());
-        contract.internal_deposit_and_stake(accounts(0).to_string(), 10_000_000_000_000);
+        contract.internal_deposit_and_stake(accounts(0), 10_000_000_000_000);
 
         context.block_index(10);
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
 
         // Test deposit balance and 
-        let upgradable_account = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let upgradable_account = contract.accounts.get(&accounts(0)).unwrap();
         let account: Account = Account::from(upgradable_account);
 
         assert_eq!(account.stake_balance, 10_000_000_000_000);
@@ -223,7 +223,7 @@ mod tests {
         // Deposit and stake function call from FT contract
         context.predecessor_account_id(accounts(1));
         testing_env!(context.build());
-        contract.internal_deposit_and_stake(accounts(0).to_string(), 20_000_000_000_000);
+        contract.internal_deposit_and_stake(accounts(0), 20_000_000_000_000);
 
 
         context.block_index(20);
@@ -231,7 +231,8 @@ mod tests {
         testing_env!(context.build());
 
         // Test deposit balance and 
-        let upgradable_account_2 = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let account_id = accounts(0) as AccountId;
+        let upgradable_account_2 = contract.accounts.get(&account_id).unwrap();
         let account_update: Account = Account::from(upgradable_account_2);
 
         assert_eq!(account_update.stake_balance, 30_000_000_000_000);
@@ -253,24 +254,25 @@ mod tests {
         context.block_index(0);
         testing_env!(context.build());
 
-        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1).to_string(), accounts(1).to_string());
+        let mut contract: StakingContract = StakingContract::new_default_config(accounts(1), accounts(1) as AccountId);
         contract.internal_create_account(env::predecessor_account_id());
 
         
         // Deposit and stake function call from FT contract
         context.predecessor_account_id(accounts(1));
         testing_env!(context.build());
-        contract.internal_deposit_and_stake(accounts(0).to_string(), 30_000_000_000_000);
+        contract.internal_deposit_and_stake(accounts(0) as AccountId, 30_000_000_000_000);
 
         context.block_index(10);
         context.epoch_height(10);
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
 
-        contract.internal_unstake(accounts(0).to_string(), 10_000_000_000_000);
+        contract.internal_unstake(accounts(0) as AccountId, 10_000_000_000_000);
 
         // Test deposit balance and 
-        let upgradable_account = contract.accounts.get(&accounts(0).to_string()).unwrap();
+        let account_id = accounts(0);
+        let upgradable_account = contract.accounts.get(&account_id).unwrap();
         let account: Account = Account::from(upgradable_account);
 
         assert_eq!(account.stake_balance, 20_000_000_000_000);

@@ -2,9 +2,9 @@ use near_sdk::Gas;
 
 use crate::*;
 
-pub const FT_TRANSFER_GAS: Gas = 10_000_000_000_000;
-pub const WITHDRAW_CALLBACK_GAS: Gas = 10_000_000_000_000;
-pub const HARVEST_CALLBACK_GAS: Gas = 10_000_000_000_000;
+pub const FT_TRANSFER_GAS: Gas = Gas(10_000_000_000_000);
+pub const WITHDRAW_CALLBACK_GAS: Gas = Gas(10_000_000_000_000);
+pub const HARVEST_CALLBACK_GAS: Gas = Gas(10_000_000_000_00);
 
 pub trait FungibleTokenReceiver {
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128>;
@@ -50,22 +50,39 @@ impl StakingContract {
         let old_account: Account = self.internal_withdraw(account_id.clone());
 
         // handle transfer withdraw
-        ext_ft_contract::ft_transfer(
-            account_id.clone(), 
-            U128(old_account.unstake_balance), 
-            Some(String::from("Staking contract withdraw")), 
-            &self.ft_contract_id, 
-            DEPOSIT_ONE_YOCTOR, 
-            FT_TRANSFER_GAS
-        ).then(
-            ext_self::ft_withdraw_callback(
+        // ext_ft_contract::ft_transfer(
+        //     account_id.clone(), 
+        //     U128(old_account.unstake_balance), 
+        //     Some(String::from("Staking contract withdraw")), 
+        //     &self.ft_contract_id, 
+        //     DEPOSIT_ONE_YOCTOR, 
+        //     FT_TRANSFER_GAS
+        // ).then(
+        //     ext_self::ft_withdraw_callback(
+        //         account_id.clone(), 
+        //         old_account, 
+        //         &env::current_account_id(), 
+        //         NO_DEPOSIT, 
+        //         WITHDRAW_CALLBACK_GAS
+        //     )
+        // )
+
+        ext_ft_contract::ext(self.ft_contract_id.clone())
+            .with_attached_deposit(DEPOSIT_ONE_YOCTOR)
+            .with_static_gas(FT_TRANSFER_GAS)
+            .ft_transfer(
                 account_id.clone(), 
-                old_account, 
-                &env::current_account_id(), 
-                NO_DEPOSIT, 
-                WITHDRAW_CALLBACK_GAS
+                U128(old_account.unstake_balance), 
+                Some(String::from("Staking contract withdraw"))
+            ).then(
+                ext_self::ext(env::current_account_id())
+                .with_attached_deposit(NO_DEPOSIT)
+                .with_static_gas(WITHDRAW_CALLBACK_GAS)
+                .ft_withdraw_callback(
+                    account_id.clone(), 
+                    old_account
+                )
             )
-        )
     }
 
     #[payable]
@@ -80,22 +97,35 @@ impl StakingContract {
         assert!(current_reward > 0, "ERR_REWARD_EQUAL_ZERO");
 
         // Cross contract call
-        ext_ft_contract::ft_transfer(
-            account_id.clone(), 
-            U128(current_reward), 
-            Some("Staking contract harvest".to_string()), 
-            &self.ft_contract_id, 
-            DEPOSIT_ONE_YOCTOR, 
-            FT_TRANSFER_GAS
-        ).then(
-            ext_self::ft_transfer_callback(
-                U128(current_reward),
-                account_id.clone(),
-                &env::current_account_id(), 
-                NO_DEPOSIT, 
-                HARVEST_CALLBACK_GAS
+        // ext_ft_contract::ft_transfer(
+        //     account_id.clone(), 
+        //     U128(current_reward), 
+        //     Some("Staking contract harvest".to_string()), 
+        //     &self.ft_contract_id, 
+        //     DEPOSIT_ONE_YOCTOR, 
+        //     FT_TRANSFER_GAS
+        // ).then(
+        //     ext_self::ft_transfer_callback(
+        //         U128(current_reward),
+        //         account_id.clone(),
+        //         &env::current_account_id(), 
+        //         NO_DEPOSIT, 
+        //         HARVEST_CALLBACK_GAS
+        //     )
+        // )
+        ext_ft_contract::ext(self.ft_contract_id.clone())
+            .with_attached_deposit(DEPOSIT_ONE_YOCTOR)
+            .with_static_gas(FT_TRANSFER_GAS)
+            .ft_transfer(
+                account_id.clone(), 
+                U128(current_reward), 
+                Some("Staking contract harvest".to_string())
+            ).then(
+                ext_self::ext(env::current_account_id())
+                .with_attached_deposit(NO_DEPOSIT)
+                .with_static_gas(HARVEST_CALLBACK_GAS)
+                .ft_transfer_callback(U128(current_reward), account_id.clone())
             )
-        )
     }
 
     #[private]
@@ -109,14 +139,14 @@ impl StakingContract {
 
                 // update account data
                 account.pre_reward = 0;
-                account.last_block_balance_change = env::block_index();
+                account.last_block_balance_change = env::block_height();
 
                 self.accounts.insert(&account_id, &UpgradableAccount::from(account));
                 self.total_paid_reward_balance += amount.0;
 
                 amount
             },
-            PromiseResult::Failed => env::panic(b"ERR_CALL_FAILED"),
+            PromiseResult::Failed => env::panic_str("ERR_CALL_FAILED"),
         }
     }
 

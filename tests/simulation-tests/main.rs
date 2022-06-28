@@ -144,7 +144,7 @@ fn deposit_and_stake_test() {
         }).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(account_json.account_id, alice.account_id());
+    assert_eq!(account_json.account_id.to_string(), alice.account_id().to_string());
     assert_eq!(account_json.stake_balance, U128(10000000000000000000000000000));
     assert!(account_json.reward.0 > 0);
     assert_eq!(account_json.unstake_balance.0, 0);
